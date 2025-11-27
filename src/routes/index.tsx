@@ -1,11 +1,18 @@
+import { bookQueries, limit } from '@/api/openlibrary'
+import { BookDetailItem } from '@/books/book-detail-item'
+import { BookSearchItem } from '@/books/book-search-item'
+import { Header } from '@/books/header'
+import { Pagination } from '@/books/pagination'
+import { SearchForm } from '@/books/search-form'
+import {
+  EmptyState,
+  ErrorState,
+  NoResultsState,
+  PendingState,
+} from '@/books/search-states'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
-import { SearchForm } from '@/books/search-form'
-import { Header } from '@/books/header'
-import { BookSearchItem } from '@/books/book-search-item'
-import { BookDetailItem } from '@/books/book-detail-item'
-import { Pagination } from '@/books/pagination'
-import { limit } from '@/api/openlibrary'
 
 export const Route = createFileRoute('/')({
   component: App,
@@ -20,7 +27,7 @@ function App() {
     return (
       <div>
         <Header />
-        <BookDetail id={id} setId={setId} />
+        <BookDetail id={id} setId={setId} filter={filter} page={page} />
       </div>
     )
   }
@@ -52,66 +59,32 @@ function BookSearchOverview({
   page,
   setPage,
   setId,
+  filter,
 }: {
   filter: string
   setId: (id: string) => void
   page: number
   setPage: (page: number) => void
 }) {
-  const query = {
-    data: {
-      numFound: 13_629,
-      docs: [
-        {
-          id: '0',
-          coverId: 240_727,
-          authorName: 'J.K. Rowling',
-          authorId: '/authors/OL73937A',
-          title: "Harry Potter and the Philosopher's Stone",
-          publishYear: 1997,
-        },
-        {
-          id: '1',
-          coverId: 8_226_196,
-          authorName: 'J.R.R. Tolkien',
-          authorId: '/authors/OL26284A',
-          title: 'The Hobbit',
-          publishYear: 1937,
-        },
-        {
-          id: '2',
-          coverId: 10_523_361,
-          authorName: 'George Orwell',
-          authorId: '/authors/OL26320A',
-          title: '1984',
-          publishYear: 1949,
-        },
-        {
-          id: '3',
-          coverId: 11_169_123,
-          authorName: 'F. Scott Fitzgerald',
-          authorId: '/authors/OL26283A',
-          title: 'The Great Gatsby',
-          publishYear: 1925,
-        },
-        {
-          id: '4',
-          coverId: 10_958_358,
-          authorName: 'Mary Shelley',
-          authorId: '/authors/OL26282A',
-          title: 'Frankenstein',
-          publishYear: 1818,
-        },
-        {
-          id: '5',
-          coverId: 10_909_258,
-          authorName: 'Charlotte Brontë',
-          authorId: '/authors/OL26281A',
-          title: 'Jane Eyre',
-          publishYear: 1847,
-        },
-      ],
-    },
+  const query = useQuery(bookQueries.list({ filter, page }))
+
+  //imperative way to get the query client for imperative stuffs (callbacks...).
+  // Do not use to render data
+  const queryClient = useQueryClient()
+
+  //promise result "error" | "success" | "pending"
+
+  //it will always be in pending if no error and no datas are ready
+  if (query.status === 'pending') {
+    return query.fetchStatus === 'fetching' ? <PendingState /> : <EmptyState />
+  }
+
+  if (query.status === 'error') {
+    return <ErrorState error={query.error} />
+  }
+
+  if (query.data.numFound === 0) {
+    return <NoResultsState />
   }
 
   return (
@@ -122,7 +95,14 @@ function BookSearchOverview({
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {query.data.docs.map((book) => (
-          <BookSearchItem key={book.id} {...book} onClick={setId} />
+          <BookSearchItem
+            key={book.id}
+            {...book}
+            onClick={setId}
+            onMouseEnter={() => {
+              void queryClient.prefetchQuery(bookQueries.details(book.id))
+            }}
+          />
         ))}
       </div>
 
@@ -135,46 +115,54 @@ function BookSearchOverview({
   )
 }
 
-const mockDescription = `***A Game of Thrones*** is the inaugural novel in ***A Song of Ice and Fire***, an epic
-      series of fantasy novels crafted by the American author **George R. R. Martin**. Published on August 1, 1996, this
-      novel introduces readers to the richly detailed world of Westeros and Essos, where political intrigue, power
-      struggles, and magical elements intertwine.`
-
 function BookDetail({
   setId,
+  id,
+  filter,
+  page,
 }: {
+  filter: string
+  page: number
   id: string
   setId: (id: string | undefined) => void
 }) {
+  const queryClient = useQueryClient()
+  const bookQuery = useQuery({
+    ...bookQueries.details(id),
+    //having initialData will add values to the cache to display as a sort of "skeleton"
+    //like in this example we are adding title, authorId and cover from the list query if available
+    initialData: () => {
+      const listData = queryClient
+        .getQueryData(bookQueries.list({ filter, page }).queryKey)
+        ?.docs.find((book) => book.id === id)
+
+      return listData
+        ? {
+            title: listData.title,
+            authorId: listData.authorId,
+            covers: [listData.coverId],
+          }
+        : undefined
+    },
+  })
+
+  const authorId = bookQuery.data?.authorId
+
+  const authorQuery = useQuery(bookQueries.author(authorId))
+
+  if (bookQuery.status === 'pending') {
+    return <PendingState />
+  }
+
+  if (bookQuery.status === 'error') {
+    return <ErrorState error={bookQuery.error} />
+  }
+
   return (
     <div>
       <BookDetailItem
-        title="A Game of Thrones"
-        description={mockDescription}
-        covers={[9_269_962, 10_513_947, 9_031_121, 8_773_509, 9_269_938]}
-        links={[
-          {
-            title:
-              'Official Book Page - A Game of Thrones (A Song of Ice and Fire, Book One) | George R.R. Martin',
-            url: 'https://georgerrmartin.com/grrm_book/a-game-of-thrones-a-song-of-ice-and-fire-book-one/',
-          },
-          {
-            title: 'Wikipedia - A Game of Thrones',
-            url: 'https://en.wikipedia.org/wiki/A_Game_of_Thrones',
-          },
-          {
-            title: 'A Wiki of Ice and Fire - A Game of Thrones',
-            url: 'https://awoiaf.westeros.org/index.php/A_Game_of_Thrones',
-          },
-          {
-            title: 'TV Tropes - A Game of Thrones (Literature)',
-            url: 'https://tvtropes.org/pmwiki/pmwiki.php/Literature/AGameOfThrones',
-          },
-        ]}
-        author={{
-          name: 'George R. R. Martin',
-          link: undefined,
-        }}
+        {...bookQuery.data}
+        author={authorQuery.data}
         onBack={() => {
           setId(undefined)
         }}

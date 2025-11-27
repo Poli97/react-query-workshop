@@ -7,8 +7,22 @@ import { routeTree } from './routeTree.gen'
 
 import './styles.css'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { bookQueries } from './api/openlibrary'
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 2 * 60 * 1000, // 2 minutes
+    },
+  },
+})
+
+//query keys works with
+//reaso why query keys are arrays is becaues it's easyer to do matching and partial matching
+//E.g:
+queryClient.setQueryDefaults(bookQueries.all(), {
+  staleTime: 2 * 60 * 1000, // 2 minutes
+})
 
 // Create a new router instance
 const router = createRouter({

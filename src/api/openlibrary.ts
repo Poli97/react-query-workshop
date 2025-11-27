@@ -1,3 +1,4 @@
+import { queryOptions, skipToken } from '@tanstack/react-query'
 import ky from 'ky'
 
 export const limit = 6
@@ -103,4 +104,32 @@ export async function getAuthor(id: string) {
     name: response.personal_name,
     ...(link ? { link } : undefined),
   }
+}
+
+//you can tell the queries where to read datas from.
+//for example when you already have some infos about the author you can pass them directly
+export const bookQueries = {
+  all: () => ['books'],
+
+  author: (authorId: string | undefined) => {
+    return queryOptions({
+      queryKey: ['authors', 'detail', authorId],
+      queryFn: authorId ? () => getAuthor(authorId) : skipToken,
+      staleTime: 20 * 60 * 1000,
+    })
+  },
+
+  list: (params: Parameters<typeof getBooks>[0]) => {
+    return queryOptions({
+      queryKey: ['books', 'list', params],
+      queryFn: () => getBooks(params),
+    })
+  },
+
+  details: (bookId: string) => {
+    return queryOptions({
+      queryKey: ['books', 'detail', bookId],
+      queryFn: () => getBook(bookId),
+    })
+  },
 }
