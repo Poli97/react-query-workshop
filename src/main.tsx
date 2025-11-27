@@ -8,11 +8,14 @@ import { routeTree } from './routeTree.gen'
 import './styles.css'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { bookQueries } from './api/openlibrary'
-
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
+import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 2 * 60 * 1000, // 2 minutes
+      //garbage collection time before cache is removed from memory
+      gcTime: 60 * 60 * 1000, // 60 minutes
     },
   },
 })
@@ -46,6 +49,13 @@ declare module '@tanstack/react-router' {
   }
 }
 
+//with PersistQueryClientProvider we can persist the cache in localStorage so that even when changing page or reloading the app
+//the cache is still there
+//if the query is not used for 5 minutes, it will be garbage collected from the storage
+const persister = createAsyncStoragePersister({
+  storage: localStorage,
+})
+
 // Render the app
 const rootElement = document.querySelector('#app')
 if (rootElement && !rootElement.innerHTML) {
@@ -53,9 +63,14 @@ if (rootElement && !rootElement.innerHTML) {
   await (await import('@/server/handlers')).worker.start()
   root.render(
     <StrictMode>
-      <QueryClientProvider client={queryClient}>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={{
+          persister,
+        }}
+      >
         <RouterProvider router={router} />
-      </QueryClientProvider>
+      </PersistQueryClientProvider>
     </StrictMode>,
   )
 }
