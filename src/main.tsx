@@ -86,6 +86,7 @@ if (rootElement && !rootElement.innerHTML) {
               //it's also fine to leave out defaultShouldDehydrateQuery
               return (
                 defaultShouldDehydrateQuery(query) &&
+                //with this I am using a flag on each query to determin if rehydrate or not
                 query.meta?.persist === true
               )
             },
