@@ -66,7 +66,15 @@ function BookSearchOverview({
   page: number
   setPage: (page: number) => void
 }) {
-  const query = useQuery(bookQueries.list({ filter, page }))
+  const query = useQuery({
+    ...bookQueries.list({ filter, page }),
+    //keepPreviousData was used before, then replaced with placeholderData for a better UX
+    // keepPreviousData: true,
+    //previousData: data of the previous key. It will keep the state of the previous key
+    //can be seen in pagination when going to next page
+    placeholderData: (previousData) =>
+      previousData?.filter === filter ? previousData : undefined,
+  })
 
   //imperative way to get the query client for imperative stuffs (callbacks...).
   // Do not use to render data
@@ -93,7 +101,13 @@ function BookSearchOverview({
         {query.data.numFound} records found
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div
+        className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
+        style={{
+          //this is a way to show that the data is from placeholderData, so old values still not updated
+          opacity: query.isPlaceholderData ? 0.5 : 1,
+        }}
+      >
         {query.data.docs.map((book) => (
           <BookSearchItem
             key={book.id}
