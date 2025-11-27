@@ -13,15 +13,25 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
+import { type } from 'arktype'
+
+const schema = type({
+  page: 'number > 0 = 1',
+  filter: 'string = ""',
+})
 
 export const Route = createFileRoute('/')({
   component: App,
+  validateSearch: schema,
 })
 
 function App() {
-  const [filter, setFilter] = useState('')
-  const [page, setPage] = useState(1)
+  // const [filter, setFilter] = useState('')
+  // const [page, setPage] = useState(1)
   const [id, setId] = useState<string>()
+
+  const { filter, page } = Route.useSearch()
+  const navigate = Route.useNavigate()
 
   if (id) {
     return (
@@ -38,8 +48,9 @@ function App() {
         <SearchForm
           onSearch={(newFilter) => {
             if (filter !== newFilter) {
-              setFilter(newFilter)
-              setPage(1)
+              void navigate({
+                search: { filter: newFilter, page: 1 },
+              })
             }
           }}
           defaultValue={filter}
@@ -49,7 +60,7 @@ function App() {
         filter={filter}
         setId={setId}
         page={page}
-        setPage={setPage}
+        // setPage={setPage}
       />
     </div>
   )
@@ -120,11 +131,7 @@ function BookSearchOverview({
         ))}
       </div>
 
-      <Pagination
-        page={page}
-        setPage={setPage}
-        maxPages={Math.ceil(query.data.numFound / limit)}
-      />
+      <Pagination maxPages={Math.ceil(query.data.numFound / limit)} />
     </div>
   )
 }
