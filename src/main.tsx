@@ -1,15 +1,16 @@
+import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { RouterProvider, createRouter } from '@tanstack/react-router'
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen'
 
-import './styles.css'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { bookQueries } from './api/openlibrary'
-import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
+import { defaultShouldDehydrateQuery, QueryClient } from '@tanstack/react-query'
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
+import { bookQueries } from './api/openlibrary'
+import './styles.css'
+import { del, get, set } from 'idb-keyval'
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -49,11 +50,24 @@ declare module '@tanstack/react-router' {
   }
 }
 
+declare module '@tanstack/react-query' {
+  interface Register {
+    queryMeta: {
+      persist?: boolean
+    }
+  }
+}
+
 //with PersistQueryClientProvider we can persist the cache in localStorage so that even when changing page or reloading the app
 //the cache is still there
 //if the query is not used for 5 minutes, it will be garbage collected from the storage
 const persister = createAsyncStoragePersister({
-  storage: localStorage,
+  //with custom idb-keyval we store the data in indexedDB
+  storage: {
+    getItem: get,
+    setItem: set,
+    removeItem: del,
+  },
 })
 
 // Render the app
@@ -67,6 +81,15 @@ if (rootElement && !rootElement.innerHTML) {
         client={queryClient}
         persistOptions={{
           persister,
+          dehydrateOptions: {
+            shouldDehydrateQuery: (query) => {
+              //it's also fine to leave out defaultShouldDehydrateQuery
+              return (
+                defaultShouldDehydrateQuery(query) &&
+                query.meta?.persist === true
+              )
+            },
+          },
         }}
       >
         <RouterProvider router={router} />

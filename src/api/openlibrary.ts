@@ -123,6 +123,9 @@ export const bookQueries = {
     return queryOptions({
       queryKey: ['books', 'list', params],
       queryFn: () => getBooks(params),
+      //meta adds extra informations. In this case we are passing "persist" that we
+      //will use in main.tsx in rehydration (shouldDehydrateQuery) to decide which queries to persist
+      meta: { persist: true },
     })
   },
 
