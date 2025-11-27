@@ -23,6 +23,16 @@ const schema = type({
 export const Route = createFileRoute('/')({
   component: App,
   validateSearch: schema,
+  //with loaderDeps we will create an object for "deps" that we can pass to the loader and get the filter and page params
+  loaderDeps: ({ search }) => ({
+    page: search.page,
+    filter: search.filter,
+  }),
+  //this will be used to preload list when the user has the intent of getting them (like we did on the mouse hover)
+  //we get the context from the route creatin injection
+  loader: ({ context, deps }) => {
+    void context.queryClient.prefetchQuery(bookQueries.list(deps))
+  },
 })
 
 function App() {
